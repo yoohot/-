@@ -8,5 +8,20 @@ java api zkClient
 分布式系统基础设施：分布式协作及配置管理系统如zookeeper，分布式缓存系统，持久化存储系统，分布式消息系统mq，搜索引擎，cdn系统，负载均衡系统，运维自动化系统，实时计算系统，离线计算系统，分布式文件系统，日志收集系统，监控系统，数据仓库等；
 
 mysql：主从复制，通过binary log在master->slave中同步：可以使statement level（sql语句，日志量少）或row level（行数据，日志量大）两种方式；为了避免master的单点故障 ，一般采用dual master，即双master，两台mysql互相作为对方的master，这样会导致两个同时更新某个数据时导致被覆盖的情况， dual master并不是提供双master写服务，而是一台提供写服务，另一个stand by或作为读库开放以避免写入冲突，防止不一致情况；master间写切换步骤：略
-分表分库:
+分表分库:分表 单表数据量太大， 分表策略：userId分表等，分表仍然是在一个库中，无法解决写库并发大的问题，这时就需要分库，分库策略类似分表；当并发读写都很高时，需同时采用分库分表，同时分库分表策略更为复杂，一种方式：
+中间变量x=userId%(库数量*表数量)，库=取整（中间变量%表数量），表=中间变量%库数量；分库和分表带来的问题：略
+
+hbase：hadoop下的子项目，以google bigTable为原型，实现了高可靠性，高可扩展性，实时读写的列存储数据库。本质上是一个稀疏的大表，存放粗粒度的结构化数据。可以简单的增减节点实现线性扩容。hbase运行在分布式文件系统hdfs之上；理论上再大的表也可以通过集群管理；https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1521453972211&di=5d701c8b201ab9cd5a885869a2ea444e&imgtype=0&src=http%3A%2F%2Fwww.itmmd.com%2Fhtml%2Fkindeditor%2Fpic%2F20141205%2F2014120508231089853121.jpg
+新增记录 put '表名' ,'rowkey','列族名称:列名称','值'
+获取记录 get '表名','rowkey' 获取列记录 get '表名','rowkey','列族名称:列名称'
+记录总数 count '表名'
+查看表中记录 scan ...
+删除列数据 delete '表名' ,'rowkey','列族名称:列名称'
+删除行数据 deleteall '表名' ,'rowkey'
+查询hbase数据只有三种方式:rowkey,rowkeyrange查询，scan全表扫描；全表消耗很大，一般不用；因此rowkey设计的好坏是能否充分发挥hbase性能的关键；有的时候为了满足特殊的查询需要建立二级索引，即把rowkey作为某个表的值来存储以供查询 ，但会带来一些问题 
+hbase的伸缩性，写入性等强于关系型数据库，但是查询维度受限，可以用搜索引擎弥补；
+
+redis：略               
+
+消息系统：应用间通信的一种方式，activemq，kafka,rabbitmq...
 
