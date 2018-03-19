@@ -1,0 +1,60 @@
+ =======netty服务端创建=======
+步骤
+1. ServerBootstrap b:服务端辅助类
+2. b设置reactor线程模型：EventLoopgroup(实际上就是EventLoop数组),EventLoop的职责就是处理所有注册到本线程多路复用器Selector上的Channel，
+  Selector的轮询操作是由绑定的EventLoop的run方法驱动的。EventLoop的职责还有就是用户自定义Task和定时任务Task的；
+3. b.channel 绑定服务端ServerSocketChannel,netty对其做了封装NioServerSocketChannel,用户不必关心这个channel的底层，只需指定具体的channel
+4. 链路建立时创建并初始化channelPipeline，channelPipeline并不是服务端必须的，它的本质是一个处理网络事件的职责链，负责管理和执行channelHandler，网络事件以流的形式在
+  channelpipeline中流转，由channelpipeline根据channelhandler的执行策略调度channelhandler执行；
+  典型的网络事件：
+   a链路注册
+   b链路激活
+   c链路断开
+   d接收到请求消息
+   e请求消息接收并处理完毕
+   f发送应答消息
+   g链路发生异常
+   h发生用户自定义事件
+5.初始化channelpipeline后，添加并设置channelhandler,channelhandler是netty拓展和定制的关键接口。利用channelhandler用户可以实现大多数功能定制，
+如编解码，心跳，安全认证，TSL/SSL，流量控制和流量整形等；netty已经提供了大量的handler：
+   1）系统编解码框架ByteToMessageCodeC
+   2）基于长度的半包解码器LengthFieldBasedFrameDecoder
+   3）码流日志打印LoggingHandler
+   4）SSL安全认证SslHandler
+   5）链路空闲检测IdleStateHandler
+   6）流量整形ChannelTrafficShapingHandler
+   7）Base64编解码Base64Decoder Base64Encoder
+6.绑定并启动监听端口，绑定之前系统会做一些列初始化工作，完成之后会启动监听端口，并将ServerSocketChannel注册到Selector上监听客户端连接,
+  ServerSocketChannel用于端口监听和客户端链路接入
+7.Selector轮询，由Reactor线程NioEventLoop负责调度并执行Selector轮询操作，选择准备就绪的channel集合。
+8.当轮询到准备就绪的channel后，就由Reactor线程NioEventLoop执行channelpipeline的相应方法，并最终调用channelhandler
+9.执行netty系统的channelhandler和用户添加定制的channelhandler，channelpipeline根据网络事件类型，调度并执行channelhandler
+
+================================
+两个EventLoopGroup线程组（也可以只只有一个），一个用来设置工作io线程，执行和调度网络事件的读写，一个负责调度和执行客户端的接入的；
+backlog netty默认100
+ServerBootStrap的handler(..)(父类方法)，childHandler(..)，childHandler添加的handler是nioServerSocketChannel使用的，
+所有连接该端口的客户端都会执行它，handler(。。)是父类的handler，它为每个新接入的客户端都会创建一个新的handler；
+
+
+======netty客户端创建=======
+1Bootstrap设置相关参数，异步发起连接
+2创建处理客户端连接、io读写的Reactor线程组NioEventLoopGroup
+3设置客户端channel:NioSocketChannel
+4创建默认的channelhandlerpipeline用来调度和执行网络事件
+5异步发起tcp连接，连接成功，则将niosocketchannel注册到多路复用器selector监听读操作位，用于数据报读取和消息发送，如果没有立即成功，则注册连接监听位到Selector等待结果；
+6注册对应的网络监听状态位到多路复用器
+7由Reactor线程组轮询Selector中各种channel，处理连接结果
+8连接成功，设置future结果，发送连接成功事件，出发channelpipeline执行
+9由channelpipeline调度执行系统和用户的handler
+
+
+
+
+
+
+
+
+
+
+

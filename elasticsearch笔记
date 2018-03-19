@@ -1,0 +1,349 @@
+DSL：标准：
+{
+  "query":{
+    
+    "bool": {
+      "must": [
+        {}
+      ], 
+      "must_not": [
+        {}
+      ], 
+      "should": [
+        {}
+      ], 
+      
+      "filter": {
+        "bool": {
+           "match": {
+             "FIELD": "TEXT"
+           },
+          "term": {
+            "FIELD": {
+              "value": "VALUE"
+            }
+          }
+        },
+        "term": {
+          "FIELD": "VALUE"
+        },
+        "terms": {
+          "FIELD": [
+            "VALUE1",
+            "VALUE2"
+          ]
+        }
+      }
+    }
+  },
+  "from": 0,
+  "size": 2
+}
+
+若只有一个query条件，可简写：{
+  "query": {
+    {
+      "match": {
+        "field": "xxx"
+      }
+    }
+  }
+}
+
+
+
+mutil_match: most_fields,best_fields,cross_fields 
+
+match_phrase: slop
+
+match_phrase: 缺点：必选包含所有的term，召回率会比较低，但是精准度高；
+
+
+同时满足召回率和精准度：
+
+
+{
+  
+   "query":{
+   
+       "bool":{
+       
+             "must":{
+          
+                  "match":{}
+    
+              },
+     
+            
+              "should":{
+  
+                          "match_phrase":{}     
+ 
+                        }//增加score
+
+   
+            }
+
+ 
+           }
+
+ }  
+ 
+但是这种的话match出来的所有doc都会match_phrase打分，match_phrase比match性能差一个数量级；
+
+rescore可以结合match_phrase，指定只对match出来的doc排名前n个doc进行重打分。
+因为一般用户只会浏览前几页的数据，这样可以提高性能：
+
+{
+  
+    "query":{
+    
+             "bool":{
+    
+                     "must":{
+      
+                            "match":{}
+    
+                        }
+
+
+                    }
+             }
+,
+  
+     "rescore":{
+     
+                "window_size":50,//指定前50个doc重打分
+    
+                 "query":{
+       
+                      "rescore_query":{
+          
+                                       "match_phrase":{}//
+     
+                                   }
+        
+                         }
+    
+                 }
+
+ }
+
+
+深入理解ElasticSearch 第二站讲解 rescore
+
+
+
+
+聚合分析
+
+ /_search
+{
+ "size":0,
+ "aggs":{
+   "aggs_name1":{
+      "aggs_op":{
+                ..
+         },
+       "aggs":{
+              "aggs_name2":{
+             "         aggs_op":{
+                        "field":"aggs_field2"
+                      },
+                      "aggs":{
+                     "aggs_name3":{
+                        "aggs_op":{ ...},
+                        "aggs":{//}/可以一直循环下去
+                       }
+                      }
+           }
+ 
+        }
+     }
+  }
+}
+
+aggs_op：max，min，avg，sum,terms...不能并列出现
+
+histogram 数字间隔， 跟terms同级别：eg
+{histogram:{field:"",interval:1000,min_doc_count:0},"aggs":{...}}按照每组1000间隔分组,min_doc_count最小数量，为0也返回
+
+date_histogram 日期间隔分组
+{date_histogram :{field:"",interval:"month",extended_bounds:{min:2017-01-01,max:2017-12-31}},"aggs":{...}}
+
+search操作可以和聚合操作一起 
+
+
+global聚合：一般的aggs的scope是search结果，global则是全部而不受search限制；
+
+{
+  "query":{},//
+   "aggs":{
+     "aggs_name1":{
+         "terms":{}//
+
+     },
+      "aggs_name2":{
+            "global":{}//设定为global
+             "aggs_op":{}
+        }
+  }
+}
+
+aggs中加上filter过滤，针对不同的aggs使用不同的filter过滤条件，而放在query中会对所有的aggs生效
+eg：统计过去10天，100天，1年的平均价格
+
+aggs:{
+  "avg_10d_price":{
+     "filter":{range:{..}},//过滤
+      "aggs":{ "avg":{}}//
+  },
+  "avg_100d_price":{
+     "filter":{range:{..}},//过滤
+      "aggs":{ "avg":{}}//
+  }
+
+}
+
+aggs order排序 asc,desc
+
+ggs_op:cardinality 相当于count（distinct（field）） 统计去重的field ，precision_threshold 最低保证准确率的个数，默认100。官网：设置100，去重百万unique value 错误率在5%以内  
+
+
+percentiles: 应用场景：查询百分比对应的临界值，例如访问量 tp50(50%耗时在多久以内)，tp90，tp99
+"aggs":{
+   "tp_percent":{
+         "lantency_percentiles":{
+             "field":"lantency",
+            "percents":[
+              50,90,99
+           ]
+        }
+   }
+}   
+
+percentile_ranks:与percentiles相反,统计values中值以内所占比重 values:[200,1000]，200毫秒内比重，1000毫秒内比重
+
+聚合分析底层原理？？？                                                                                                                                                              
+ 聚合terms:{
+ "collect_mode":""//指定深度或广度优先，广度优先效率更高
+}  
+
+nested object，需使用nested查询，且需指定path为nested对应的属性名
+
+doc_value:默认是true，非（text类型切analyzed：true),可以在mapping中设置doc_value:false不建立正排索引;会建立正排索引，用于排序,聚合，过滤,脚本等，
+
+聚合分析底层原理？？？                                                                                                                                                                                          聚合terms:{
+
+ "collect_mode":""//指定深度或广度优先，广度优先效率更高
+}    
+
+es中使用悲观锁：
+index锁：put /test_idx/_test_type/test_id/_create  上一把基于testId的锁，index，type，testId名字都是任意，但是跟其他线程保持一致就行，用完之后delte test_index                                                document锁：对某一个具体的doc上锁 ，基于upset和script等      
+
+一 nested Mapping：嵌套对象避免搜索的问题:
+"properties":{
+  "field":{
+    "type":"nested",
+     "properties":{...}
+   }
+ }  
+搜索的时候也要使用nested搜索，且需指定nested的path为对应的field
+
+二 基于nested下的属性aggs
+eg:
+ "aggs":{
+    "aggs_name":{
+       "nested":{
+            "path":"field"
+       },
+        "aggs":{
+           // 可以aggs field下的field了
+          //这里如果嵌套了子的aggs，且是nested之外的field，需先"reverse_nested":{},reverse_nested跟aggs_op同级别
+        }
+       
+    }
+
+ }
+
+termvector搜索：数据分析
+
+highlight：高亮显示，同query级别，有三种类型，plain，posting，vector，默认plain就行。可以
+{
+  "query":{},
+  "highlight":{
+    "pre_tags":["<tag1>"],
+    "post_tags":["</tag1>"]
+    "fields":{
+     "field_name":{"type":"plain","fragment_size":10,"number_of_fragment":,   }
+   }
+  }
+}
+
+seaech template:
+1.简单的设置key替换
+get /search/template
+{
+  "inline":{
+    "query":{
+      "match":{"{{fieldKey}}":"{{fieldValue}}"}
+     }
+   },
+  "params":{
+    "fieldKey":"field1",
+    "fieldValue":"val"
+  }
+}
+2 toJson片段替换
+get /search/template
+{
+  "inline":{"{..{{#toJson}}condition{{/toJson}} ..}"},
+  "params":{
+     "condition":{"title":"value"}
+  }
+}
+
+其他：join;default value;
+conditional条件控制：但是需放置模板文件到scripts下
+....
+{{#some_key}}
+   **  {{some_key}}
+ {{/some_key}}
+....
+"params":{
+  "some_key":"xxx"，//存在这个key  就会显示上面的
+}
+                                                                                                        
+
+ES高性能前缀搜索（搜索推荐），completion suggest：
+需要在mapping中先设置，后用suggest搜索     
+mapping：
+{"title":{
+  "type":"text","fields":{ "suggest":{"type":"completion","analyzer":"ik..." }}
+ 
+}}    
+然后suggest搜索:      
+search:
+{
+  "suggest":{
+    "suggsetName":{
+      "prefix":"value",
+      "completion":{
+           "field":"title.suggest"
+      }
+    
+  }
+ 
+  }
+}  
+
+动态映射模板；在mapping中设置dynamic_templates。后续符合规则的字段会自动生成对应的映射
+
+geo_point 地理位置类型数据
+mapping的type为：geo_point
+geo_bounding_box:找出落在指定矩形框中的坐标点
+geo_distance:找出与指定位置在给定距离内的点
+geo_distance_range:找出与指定点距离在给定最小距离和最大距离之间的点
+geo_polygon:找出落在多边形中的点。这个过滤器使用代价很大。当你觉得自己需要使用它，最好先看看 geo-shapes
+以上搜索也可以作为filter过滤条件
+geo_distance聚合:统计某个点作为原点，距离原点的初始位置，结束为止内的数据统计，可多个初始结束位置，可distince_type，三种type

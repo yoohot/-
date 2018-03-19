@@ -1,0 +1,190 @@
+第一章：
+ AnnotationConfigurationApplicationContext  spring4.0开始的注解容器
+ @Bean  bean的id为方法名
+ @Primary & @Quariter 
+ @Configuration 
+ 唯一构造器注入bean（免侵入）
+ @postConstruct @PreDestory  &  InitalingBean .. & @Bean(init=..)
+ @ComponentScan
+ 接口FactoryBean 名字为$bean的名字 
+ 
+
+第二章：
+ BeanPostProcesser spring提供的拓展点，容器中每个bean都会执行
+   》postProcessAfterInitialization  init方法之后执行
+   》postProcessBeforeInitialization init方法前，属性注入之后执行  
+  ApplicationContextAware原理就是spring中加了一个BeanPostProcesser ，在这里面判断bean是否是ApplicationContextAware子类，是的话就调用其setApplication方法；可以添加自己的BeanPostProcesser 处理特殊的bean，例如添加某个bean的代理类
+
+
+第三章：
+ BeanFactoryPostProcessor 容器后只处理器，有一个接口方法，在容器初始化时执行
+  顺序 BeanFactoryPostProcessor 》BeanPostProcesser 》bean init 》
+ BeanDefinitionRegistryPostProcessor 是BeanFactoryPostProcessor，在此基础上添加了一个方法  postProcessDefinitionRegistry（BeanDefinitionRegistry registry）；registry可以动态添加bean到容器（容器本身也有动态注入的方法）
+  顺序 BeanFactoryPostProcessor（一次） 》BeanPostProcesser（每个bean） 》bean init 》postProcessDefinitionRegistry（一次）
+ 
+1.两个bean都继承beanPostProcesser，并且互相需要注入对方，都有init方法，是否报错？
+2.bean继承beanFactoryPostProcesser，并且在继承方法中获取bean？
+3.BeanDefinitionRegistryPostProcessor 的postProcessDefinitionRegistry（..）添加的bean是否会执行BeanPostProcesser ？
+
+springboot：
+引入springboot依赖两种方式：1继承springboot-starter 2在dependencyManagement中加入spring-boot-dependences,且scope为import，type为pom；这两种都需要在dependencies中引入starter
+
+@SpringBootApplication上面三个注解 @SpringBootConfiguration、@EnableAutoConfiguration和@ComponentScan
+@SpringBootConfiguration等同@Configuration  一个是spring的，一个是springboot的
+
+第四章：
+springboot获取配置方式
+ 默认配置文件application.properties，可以在classpath或classpath/config下
+修改文件名、路径： 
+ 1 main的arguments中指定文件名--spring.config.name=XXX或指定文件全路径 --spring.config.location=classpath:/ ,file:E:/..可多个，逗号隔开
+ 2在@Configuration的类上加上@PropertyResource("path")来注入单个配置文件或@PropertyResources注入多个
+ 
+获取配置：
+1 Context.getEnvironment()获取当前环境变量，返回Environment可以获取配置信息；
+2 @Autowired 注入Environmet
+3 @Value("${key:默认值}")，这里可加默认值，不需要getter、setter
+4@ConfigurationProperties(prefix="xx",locations="")注解到bean上，locations可不要，就会到别的配置文件中找,这个bean中的(xx.)key property就会被赋值，但是需要getter、setter 
+
+可以在application.properties中${key}应用另外的key
+可以key[n]方式注入集合元素
+
+动态添加属性： EnvironmentPostProcessor接口，可以在接口方法中动态去决定添加哪个地方的属性；前提是需要在meta-inf/spring.factories文件中注册这个实现类--》因为该接口是springboot提供的
+
+不同环境配置
+SpringApplication.setAdditionProfiles("dev/test,pro")..（无效，需到默认配置文件中加上spring.profiles.active=prod才会生效） 指定application-test/dev .properties配置文件或者使用运行程序的main参数方式 spring.profiles.active=test,dev 多个逗号隔开，@Profile("test")和@Bean一起使用，只有在test 激活时才注入这个bean，也可以@Profile放在bean类上；
+
+接口Condition和注解@Conditional可以实现特定条件的是否装配某个Bean，@Conditional配合@Bean或@Configuration使用；Springboot提供了大量的Condition&Conditional的组合条件供使用，例如@CondtionalOnBean
+@ConditionalOnClass(XX.class),@ConditionalOnMissingBean..这些条件注解在@EnableAutoConfiguration导入的spring.factories中的配置类中大量使用到，因为这些配置类会导入很多可能并不存在classpath下的某个bean，所以需要判断下。不然报错
+
+第五章：
+@Enable*原理：启动某个特性
+@ConfigurationProperties的原理是@SpringBootApplication中的@EnableAutoConfiguration中@EnableConfigurationProperties，用@EnableConfigurationProperties注解使@ConfigurationProperties生效
+@Async加到bean的方法上，这样该调用该bean的方法将会异步执行，原理是@SpringBootApplication中的@EnableAutoConfiguration中@EnableAsync
+原理：@Import导入了一些Bean或配置Bean到容器，@Import导入的bean上可以再有@Import，可以无限嵌套下去
+可以使用@Import注入一个bean或Configuration（即不用加@Configuration而是在Application启动类@Import导入）
+@Enable*原理就是对应注解导入了@Import（XX）配置类，如果导入的XX类是ImportSelector的子类，则会将其接口方法返回的String[]对应的class都导入到容器中去，若导入的XX是ImportBeanDefinitionRegistrar接口的子类，则可以在其接口方法中动态注入bean（该方法没有返回值）；
+所以根据以上结论可以自定义@Enable*注解，在其上@Import导入配置，而导入的类往往是上面的两个接口子类（也可以不是）。接口方法中可以通过方法参数获取到@Enable*对应的属性值
+
+@EnableAutoConfiguration原理：通过@Import导入classpath下的所有META-INF/spring.factories中的类，并加载到容器中,注解@Import会导入一个ImportSelector配置类，这个配置类会从classpath下读取所有META-INF/下的spring.factories文件，并从中读取key为org.springframework.boot.autoconfigure.EnableAutoConfiguration的所有value，并将这些value（类路径，逗号隔开多个，这个类可以是configuration配置类或普通bean，因为这些是作为ImportSelector的返回值）作为bean注入到容器中去；@EnableAutoConfiguration中的字符串常量是作为spring.factories中的key，在上面的ImportSelector中会去先获取这个key是否为false，为false就不加载到容器中去
+
+eg : @EnableConfigurationProperties ：spring.factories会注入ConfigurationPropertiesConfiguration的bean，这个bean 启用了@EnableConfigurationProperties（value=空），为空默认就会注入一个后置处理器ConfigurationPropertiesBindingPostProcessor去处理spring中所有@ConfigurationProperties的bean
+
+
+@import 阶段总结: springboot的核心入口就是@Import注解，通过他导入配置bean，如果这个bean是特定的两个接口，则可以通过这两个接口方法注入bean；而注入的bean也可以是配置bean，可以在其上继续使用@Import导入bean，这样就可以无限导入了。而导入的配置bean结合@Conditional和Condition接口实现是否导入逻辑。这就组成了springboot自动配置的核心功能，
+
+
+第六章：
+springboot 事件监听：
+1定义事件 ApplicationEvent
+2注入监听器 ApplicationEventListener到容器(或者可以app.addListener（..）或者配置文件中添加 application.properties中 context.listener.class=XXX （原理DelegatingApplicationListener）或者加到某个Bean的方法上@EventListener，会根据参数自动调用（原理EventListenerMethodProcessor）或者 META-INF/spring.factories中添加)
+3发布事件 Context.publishEvent(Event)
+Spring和springboot已经为我们提供了很多事件例如ApplicationContextEvent，并且会在相应的时机抛出这些事件，我们只需要定义监听，不需要自己抛出对应事件
+
+spring的 Ordered接口？？？
+
+第七章：
+spring两个扩展点：
+1 ApplicationContextInitializer 接口，在容器refresh之前调用
+  注册Initializer方式 1app.addInitializer(..) 2配置文件中添加配置项 context.initializer.class 3META-INF/spring.factories中添加org.springframework.context.ApplicationContextInitalizer=class..;
+   Spring本身就提供了很多Initializer，在spring.factories中可以查看到
+2 CommandLineRunner接口 spring容器初始化完成之后最后的回调接口（类似开机自启动），接口方法参数为main的args参数
+  注册方式： 加入到容器中作为bean即可，可以通过@Order注解或继承Ordered接口 标注多个Command顺序
+  extra：也可以通过ApplicationRunner接口实现，这个接口的接口方法参数ApplicationArguments是上面接口方法参数的一个拓展封装，处理参数更方便
+
+  spring容器初始化流程？
+
+第八章：
+  springboot运行流程：SpringApplication源代码
+
+
+第九章：
+springboot-web
+1 springmvc @PostMappingg @GetMapping ..
+2 使用jsp 需要导入tomcat-embed-jsaper jar包 并配置spring.mvc.prefix/suffix
+3使用freemaker 需要导入spring-boot-starter-freemaker jar包 配置spring.freemaker.templateLoaderPath 默认classpath：/templates
+4 springboot-web默认使用的是tomcat，使用jetty需要springboot-starter-web中exclude tomcat-starter，并导入依赖spring-boot-starter-jetty
+5 静态资源，src/main/webapp 下可以直接访问。 静态资源默认可放路径：META-INF/resources,resources,static,public。可以spring.resources.staticLocations更换
+6 对servlet、filter、listener...支持，第一种方式： web3.0提供@WebServlet(/user.do)、@WebFilter("/user/*")，@WebListener,需要springboot @ServletComponentScan 将这些servlet和filter导入容器 
+第二种方式：@Bean注入到容器，注入特殊的bean：ServletRegistrationBean，FilterRegisterationBean... （servlet3版本可以使用第一种方式）
+7 springmvc拦截器：拦截器HandlerInterceptor实现类（三个方法调用：Controller之前，返回页面之前，返回页面之后），写一个bean，继承WebMvcConfigurationAdapter抽象类，重写里面的addInterceptor方法,并调用参数Registry.addInterceptor把拦截器加进去。
+8异常处理：第一种：写一个bean继承ErrorPageRegistrar接口，在接口方法中添加处理逻辑（可以指定某个状态码或异常返回特定的视图）第二种：Controller中处理方法上加@ExceptionHandler 或某个@ControllerAdvice的bean中的@ExceptionHanderl方法（返回视图或对象）
+9定制tomcat：第一种：实现EmbeddedServletContainerCustomizer，并注入容器，在接口方法中可以获取EmbeddedServletContainerFactory 参数，可以用这个参数设置tomcat属性
+ 第二种：自己new EmbeddedServletContainerFactory 并设置属性，然后注入容器（第一种方式也只是简单new这个对象到容器）
+10 springboot-jdbc: 配置datasource：加入数据库驱动，配置数据库基础信息，springboot就会自动配置Datasource数据源，JdbcTemplate，可以直接从容器中获取使用.spring.datasource.type可以指定具体的datasource，默认支持四种 tomcat，hikari，dbcp，dbcp2. 配置自己的Datasource：只需装配一个Datasource到容器中即可
+事务：首先要开启事务 @EnableTransactionManagement然后在具体的方法或类上加入@Transactional（这个默认只会对RuntimeException回滚，可以指定）
+11 springboot-aop:加入spring-boot-starter-aop就会自动启动aop，也可以配置文件spring.aop.auto:设置是否启动；默认是使用jdk动态代理实现AOP，这种则aop对象需要实现接口，否则就是cglib的动态代理，jdk动态代理的对象只能通过接口获取。 spring.aop.proxy-target-class=false或不配置表示使用jdk，true则使用cglib；实现aop @Aspect注解 @Before @After @Throwing @Around ，切入点 @Pointcut
+
+
+第十章：
+实现自己的spring-boot-starter-*：
+1 实现一个装配类（configuration）：装配类里面去装配需要引入的bean，这个bean的一些参数可以结合@ConfigurationProperties(prefix="**")生成一个配置类， 
+由上面的装配类@EnableConfigurationProperties(此配置类.class)引入容器，然后在装配类中结合@ConditionalOnClass@ConditionalOnMissingBean..等引入对应的bean
+2应用中使用方式：第一种：实现 一个注解 然后@Import这个装配类 第二种：在META-INF/spring.factories中配上
+eg:jedis
+@Configuration
+@ConditionalOnclass(Jedis.class)
+@EnableConfigurationProperties(RedisProperties.class)//自己写的配置类
+public class RedisAutoConfiguration{
+  @Bean
+  @ConditionalOnMissingBean
+  public Jedis jedis(RedisProperties p{
+     return new Jedis(p.gethost(),t.getPort())
+ }
+}
+应用方式一
+@...
+@Import(RedisAutoConfiguration.class)
+public @Interface EnableAutoRedis{
+
+}
+
+第十一章：
+springboot 日志配置 
+日志级别：其中 trace，debug，info,warn,error.fatal,off
+1默认使用logback，可以在application.properties中定义比较简单的日志配置 (此时的配置详情在spring-log中有定义xml)，一般是使用专门的配置文件logback.xml或logback-spring.xml,
+2使用其他日志：排除依赖 spring-boot-starter-logging ,加入其他log依赖，加入配置文件如log4j.xml
+
+
+第十二章：
+springboot监控：
+加入依赖 metrics /mapping,/beans,/info,/metrics,/env,/health ...
+自定义健康状态检查 （/health）：实现HealthIndictor接口，加入容器即可
+/metrics 中可以返回 CounterService对某个key计数，GuageService提交某个key的value 的信息
+Metrics不仅可以输出到页面，还可以输出到jmx，redis等，通过spring容器中装配一个MetricWriter实现定向输出
+
+第十三章：
+springboot test
+加入spring-boot-starter-test scope 为test
+1测试普通的bean：@Runwith（SpringRunner.class） @SpringBootTest即可
+2测试容器里没有的或难以获取的bean，用mock测试：@Runwith（SpringRunner.class） @SpringBootTest 
+代码里@MockBean引入某个虚拟的bean，并通过BDDMockito.given(..).willReturn(..)设置mock值
+3测试controller：三种方式：第一种 @Runwith（SpringRunner.class） @SpringBootTest（webEnvironment=WebEnvironment.**//设置web环境） 并代码里引入TestRestTemplate 来测试controller
+第二种：@Runwith（SpringRunner.class） @SpringBootTest @AutoConfigurationMockMvc，代码里引入@Autowired MockMvc ，通过这个对象测试； 第三种：@Runwith（SpringRunner.class） @WebMvcTest(controllers=**//指定测试的controller)，这种方式不会加入自动配置到容器，controller所依赖的bean无法注入，只能作为简单的Controller测试
+4生成只有test环境才有的bean ，test类路径下@TestConfiguration即可，并@SpringBootTest(classed=*//这个Congiguration类)
+5引入测试环境的配置 三种方式：一 src/test/resources/application.properties..(优先于src/main/resources/下的配置) 二 @SpringBootTest(properties={"key=value"}) 三 EnvironmentTestUtil.addEnvironment(..)
+
+#####springboot集成mybatis
+添加mybatis依赖即可，springboot没有集成mybatis，但是mybatis提供了对springboot的集成mybatis-spring-boot-starter
+
+第十四章：
+springboot打包部署，assemble打包插件
+
+
+
+ext: swagger生成restapi，在页面可查看执行等，可以自定义注解只在test环境生成api
+springfox-swagger2
+springfox-swagger-ui
+@Api：修饰整个类，描述Controller的作用
+@ApiOperation：描述一个类的一个方法，或者说一个接口
+@ApiParam：单个参数描述
+@ApiModel：用对象来接收参数
+@ApiProperty：用对象接收参数时，描述对象的一个字段
+@ApiResponse：HTTP响应其中1个描述
+@ApiResponses：HTTP响应整体描述
+@ApiIgnore：使用该注解忽略这个API
+@ApiError ：发生错误返回的信息
+@ApiImplicitParam：一个请求参数
+@ApiImplicitParams：多个请求参数
+
+
+ 

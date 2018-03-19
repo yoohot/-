@@ -1,0 +1,6 @@
+响应式编程支持
+最低Java支持版本为Java 8
+HTTP/2 支持
+使用 Lambda 表达式注册 bean
+使用 JUnit 5 执行条件和并发测试
+Spring WebFlux&Spring WebMVC 支持最新的 API

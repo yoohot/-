@@ -1,0 +1,65 @@
+第一章：Spring Boot
+ 在springboot-web项目中加入依赖spring-boot-starter-actuator就可以自动启用监控,监控端点（请求地址）：
+   应用配置类：
+   1 /autoconfig:查看自动装配的bean，成功或失败情况
+   2 /beans:查看spring容器中所有bean信息
+   3 /configprops:查看配置信息
+   4 /env:获取系统环境属性，包括环境变量，jvm信息，应用配置信息，命令行参数
+   5 /mappings: 查看springmvc提供的所有mapping （包括这些端点）
+   6 /info:返回一些自定义信息，默认返回空，可以配置 info.app.name=XX;则返回app.name：XX
+   度量指标类：
+   7 /metrics:获取系统运行状态信息。/metrics/{xx} 获取某个信息 例如/metrics/mem.free
+   8 /health:检测系统中一些组件健康状态信息。springboot已经实现了很多监控组件（磁盘，datasource，redis...）.有的也没有，可以自己实现HealthIndicator接口，接口方法中就行检测并返回Health，将这个class注入容器就可以。
+   9 /dump:程序运行中的线程信息
+   操作控制类：比较敏感，需要配置启动
+   10 /shutdown: 需配置 endpoints.shutdown.enable=true
+
+第二章: Spring Cloud Eureka 
+Eureka：服务治理，Springcloud通过为Eureka增加Springboot风格的自动化配置，我们只需要简单的引入依赖和使用注解配置就能让Springboot构建的微服务应用轻松与Eureka服务治理体系相结合。
+主要实现微服务实例的自动化注册与发现，服务间同步使用REST方式
+spring.application.name=eureka-server
+server.port=1002
+# 是否注册该服务 默认true
+eureka.client.register-with-eureka=true
+#是否检测服务清单 默认true
+eureka.client.fetch-registry=true
+#eureka server 更行服务缓存清单列表的间隔 默认30
+eureka.client.registry-fetch-interval-seconds=30
+#eureka server踢出服务提供者时间 默认90
+eureka.instance.lease-expiration-duration-in-seconds=90
+#renew，心跳间隔，续约， 默认30
+eureka.instance.lease-renewal-interval-in-seconds=30
+#注册中心地址
+eureka.client.serviceUrl.defaultZone=http://127.0.0.1:1001/eureka/
+#关闭EurekaServer自我保护机制
+eureka.server.enable-self-preservation=false
+#设置EurekaClient的region，默认default
+eureka.client.region=
+#设置eureka.client.zones,可设置多个,默认defaultZone
+eureka.client.availability-zones=
+
+
+失效剔除：Eureka Server启动时会创建一个定时任务，每隔一段时间（默认60）将清单中超时的（默认90s）没有续约（renew）的服务剔除
+自我保护：服务心跳（续约）比例在15分钟内低于85%（线上通常因为网络原因），EurekaServer会将当前服务实例信息保护起来，让这些服务实例不会被失效剔除机制（误认为失效而）剔除，
+          但是若这段期间服务实例出现问题，那么客户端实际上拿到了失效的服务了，就会出现调用失败的情况，所以客户端要有失败容错机制，如重试，断路器等
+
+
+第三章:客户端负载均衡 Spring Cloud Ribbon
+使用：消费者直接使用@LoadBalanced注解修饰的RestTemplate来实现面向服务的接口调用
+RestTemplate是spring的，Ribbon实现负载均衡原理：通过LoadBalancerInterceptor拦截器对RestTemplate请求进行拦截，利用SpringCloud负载均衡器LoadBalancerClient实现负载均衡
+配置：spring.cloud.loadbalancer.retry.enabled=true 启用重试
+
+
+第三章 服务容错保护  Hystrix
+Hystrix具备服务降级、服务熔断、线程和信号隔离、请求缓存、请求合并以及服务监控等
+
+第四章 Ribbon和Hystrix的整合体 Feign
+除了整合Ribbon和Hystrix外，还提供了一种申明式Web服务客户端定义方式
+
+第五章 API网关 Zuul
+1作为系统的统一对外入口；
+2与服务治理框架结合，实现自动化实例维护以及负载均衡的路由转发
+3实现服务权限的校验与服务逻辑的分离
+路由规则；提供了一套过滤器机制，可以实现对调用的拦截和校验，开发者可以自己创建各种校验器ZuulFilter
+
+第六章 分布式配置中心 Config

@@ -1,0 +1,27 @@
+结果集级联：association、collection、descriminator
+association:一对一
+collection：一对多
+
+别名：为一个类的全限定名设置一个名称，这样在mybatis配置文件可以直接使用这个名称代替全限定名
+
+一级缓存：只在sqlSession类生效，默认开启
+二级缓存：在sqlSessionFactory级别生效，即各个sqlSession中共享缓存，默认未开启；要求返回的pojo必须是可序列化的
+           在映射文件中<cache/>开启二级缓存 ，属性type可以指定自定义的缓存，如自己实现redis缓存
+
+
+
+mybatis解析和运行原理：
+SqlSession 调用四大对象执行， Executor StatementHandler ParameterHandler ResultHandler,Executor用来调度这三个对象
+运行：一 读取配置文件到Configuration对象，用来创建SqlSessionFactory 二 SqlSession执行
+运行原理：动态代理、反射等技术,职责链模式（可以实现自定义插件）
+
+mybatis-spring ：
+ 配置数据源
+ 配置SqlSessionFactory
+ 配置SqlSessionTemplate（对SqlSession的封装）
+ 配置Mapper
+ 配置事务
+
+ mybatis分页：
+ RowBounds 会查出所有数据然后分页，不推荐使用
+ 插件
