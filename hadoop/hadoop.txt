@@ -1,0 +1,74 @@
+①特点：高可靠性，高可扩展性，高效性，高容错性
+②组成：hdfs，yarn，mapreduce
+   1hdfs：
+     1.NameNode：存储文件的元数据：如文件名、文件目录，文件属性，文件的块列表和块所在的DataNode等
+     2.DataNode:在本地文件系统存储文件块数据，以及块数据的校验和
+     3.
+
+Secondary NameNode：用来监控HDFS状态的辅助后台程序，每隔一段时间获取HDFS元数据的快照
+  2yarn：
+    1.ResourceManager
+    2.NodeManager
+    3.ApplicationMaster
+    4.Container
+  3mapreduce   
+    1.map阶段并行处理输入数据
+    2.reduce阶段对map结果汇总 
+③hadoop生态体系：
+ 1传输层：sqoop、flume、kafka。。。 
+ 2存储层：hdfs、hbase（基于hdfs）。。
+ 3资源管理：yarn 
+ 4数据处理：离线计算mapreduce、spark core, 数据查询hive、spark sql，数据挖掘mahout、spark mlib，数据分析sparkR，实时计算sparkstream、storm，
+ 5任务调度:Oozie、azkaban
+ 6平台配置调度：zookeeper
+ 7业务模型层：业务模型，数据可视化，业务应用
+④eg 推荐系统架构
+⑤环境搭建
+    1虚拟机网络设置为NAT模式
+    2克隆虚拟机
+    3修改为静态ip
+    4修改主机名
+    5关闭防火墙
+    6在opt目录下创建文件  
+    7安装jdk
+    8安装Hadoop：解压，环境变量
+⑥案例（伪分布模式）
+ 运行模式：本地模式，伪分布模式，分布式模式
+ 官方案例：grep案例，wordcount案例
+ 伪分布式环境搭建（只有一个节点的分布式）：
+   （a）配置：hadoop-env.sh:配置javahome路径
+   （b）配置：core-site.xml<!-- 指定HDFS中NameNode的地址 --><!-- 指定hadoop运行时产生文件的存储目录 -->
+   （c）配置：hdfs-site.xml  ： <!-- 指定HDFS副本的数量 -->
+   启动集群：第一次启动初始化namenode  bin/hdfs namenode -format，启动namenode sbin/hadoop-daemon.sh start namenode，启动datanode [atguigu@hadoop101 hadoop-2.7.2]$ sbin/hadoop-daemon.sh start datanode
+   查看集群：jps查看，web端口查看http://hadoop100:50070，日志查看 logs/*
+   操作集群：1在hdfs文件系统上新建文件夹：bin/hdfs dfs -mkdir -p /user/cgl/input  2上传文件 bin/hdfs dfs -put 本地文件 /user/cgl/input
+           3运行mapreduce程序wordcount bin/hadoop jar share/hadoop/mapreduce-examples.jar /user/cgl/input(hdfs路径作为输入) /user/cgl/output(hdfs作为输出)
+           4获取文件 bin/hdfs dfs -get /user/cgl/output/* ./tmp(本地路径) 5删除文件 bin/hdfs dfs -rm -r /user/cgl/output/*
+    YARN上运行mapreduce：
+   （d） hdfs配置如上，配置yarn-env.sh(配置javahome),配置yarn-site.xml<!-- reducer获取数据的方式 --><!-- 指定YARN的ResourceManager的地址 -->
+    (e)配置：mapred-env.sh javahome
+    (f)配置： (对mapred-site.xml.template重新命名为) mapred-site.xml<!-- 指定mr运行在yarn上 -->
+    启动集群：先启动前面的nodenode和datanode;然后启动 yarn(sbin/yarn-daemon.sh start resourcemanager和sbin/yarn-daemon.sh start nodemanager）
+    查看集群：http://hadoop100:8088/cluster查看yarn
+    操作集群：运行前面的mr程序wordcount
+ 修改本地临时文件存储目录：即修改datanoe存储目录，先停止集群，删除之前的datanode文件夹（data和logs），设定新路径（core-site.xml中），格式化namenode，启动
+ 开启mr历史记录服务：
+   1）配置mapred-site.xml mapreduce.jobhistory.address和mapreduce.jobhistory.webapp.address
+   2）启动历史服务器：sbin/mr-jobhistory-daemon.sh start historyserver
+   3）查看http://192.168.1.101:19888/jobhistory。也可以在yarn查看页面上查看
+ 开启mr日志聚集服务：
+   日志聚集概念：应用运行完成以后，将日志信息上传到HDFS系统上。
+   1）配置yarn-site.xml <!-- 日志聚集功能使能 --> <!-- 日志保留时间设置7天 -->
+   2)重启集群，重新运行mr的wordcount程序
+   3）查看http://192.168.1.101:19888/jobhistory，也可以在yarn查看页面上查看
+ 配置文件说明：hadoop的配置文件分为默认配置文件和自定义配置文件，默认配置文件在相对应的java jar包中如	hadoop-hdfs-2.7.2.jar/ hdfs-default.xml
+               自定义配置文件在${HADOOP_HOME}/etc/hadoop下core-site.xml，hdfs-site.xml，yarn-site.xml，mapred-site.xml
+
+⑦配置集群：
+  ssh免密登陆：原理，步骤 略
+  scp命令：远程复制命令  pc1,pc2,pc3
+  rsync命令:远程同步命令 与scp不同的是，相同则不复制 （远程复制脚本实例xrsync）
+
+
+
+	

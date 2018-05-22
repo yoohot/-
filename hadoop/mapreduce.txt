@@ -1,0 +1,49 @@
+一 mapreduce入门
+优点：易于编程、良好扩张、高容错性、适合pb级别海量数据离线处理
+缺点：不擅长实时计算、流式计算、DAG计算
+核心思想：map阶段和reduce阶段；mr只能有一个map阶段和一个reduce阶段。可以多个mr程序串行执行
+一个mr运行时三类实例进程：MrAppMaster、MapTask、ReduceTask
+编程规范：程序分为三个部分：Mapper、Reducer、Driver（提交运行mr读客户端）
+wordcount案例编写：集群运行，本地运行
+
+二序列化
+Writable接口，序列化方法写和反序列化方法读顺序要保持一致
+
+三mapreduce原理
+maptask并行度决定因素：
+   TextInputFormat：切片大小（默认block大小128m）;根据输入文件和切片大小对每一个文件进行单独切片；一个切片运行一个maptask
+   CombineTextInputFormat：专门用来处理小文件的。可以将多个小文件从逻辑上规划到一个切片中，job.setInputFormatClass(Combine..class)
+                           combine...setMaxInputSplitSize()、setMinInputSplitSize().
+Partition分区：eg：mr输出到不同程序；
+   默认分区HashPartitioner：对key对hashcode对numReduceTask（默认1）取摸，用户无法控制某个key到哪个文件
+   自定义分区：继承Partitioner，job.setPartitionerClass(..),job.setNumReduceTask(n);根据Partitioner决定去哪个reducertask，
+               每个reducetask对应一个输出文件
+排序WritableCpmparable接口
+mr运行流程：生产切片(切片原则)文件，切片数量即为maptask任务数量，生成job.xml文件，包含所有配置信息。联合mr程序一起分发到集群所有
+参与mr程序到节点上，每个maptask单独运行，对应切片中指定到文件数据。inputFormat（recorderReader）读取数据，经过自定义Mapper后将数
+据（k,v）写入到环形缓冲区，排好序，其中式左边索引右边数据（kv）,当缓冲区满80%就往磁盘上写文件，每次写对应分区个数个文件。最终会merge成
+每个分区一个文件，merge前判断是否压缩，有序，在写(溢写)文件和merge文件过程中可以加入combine组件对key做一些处理。当maptask都执行完毕开始执行reducetask，
+reducetask数量由job设置。每个reducetask读取对应对所有对分区文件，最终合并成一个分区文件并排序，经过Reducer后再outputFormat和
+recorderWriter输出；
+maptask工作流程：read阶段 - map阶段 - collect(分区、排序)阶段 - 溢出阶段 - combine阶段
+Combiner合并：对每一个maptask对输出进行局部汇总，减小网络传输；不是所有场景都适用combiner如平均值。combiner的父类也是Reducer；job.setCombinerClass
+             可公用Reducer类，因为做对工作是一样的。
+分组排序：对同一分区所有key的某几个属性做比较，这些属性相同作为分组依据，相同就为同一组，只输出同一组中一个kv到reduce；继承WritableComparator；进入reduce前执行；
+          eg：取每个订单中价格最高的商品输出；job.setGroupingComparatorClass
+shuffle机制：map方法之后，reduce方法之前
+自定义inputformat：
+自定义outputformat：
+多表合并案例：多表关联对列作为key:1 reduce阶段处理 2 map阶段处理（小表作为全局缓存）    ；注：reduce的迭代器iterator做了特殊处理，只会new 一个value，而后遍历对
+             value会复用第一个new出来的value
+数据清洗案例(ETL):计数器对使用：context.getCounter(..).increment(1);
+多job串联操作案例：
+找共同好友案例：
+reducetask工作机制：
+  1 reduceTask=0，表示没有reduce阶段，输出文件个数等于map个数
+  2如果reducetask=1但是分区大于1，则不会执行分区过程
+  3数据分布不均匀，可能会在reduce阶段产生数据倾斜。
+ copy阶段 -> merge阶段 -> sort阶段 -> reduce阶段
+压缩：hadoop支持对编解码：DEFAULT、GZip、bzip2、LZO、Snappy.区别和优点：略
+ eg:1 map输出压缩 configuration.setBoolean("mapreduce.map.out.compress",true);
+     configuration.setClass("mapreduce.map.output.compress.codec",BZip2Codec.class,CompressionCodec.class);
+    2设置reduce输出压缩：FileOutputFormat.setCompressOutput(job,true);FileOutputFormat.setOutputCompressorClass(job,BZip2Codec.class);

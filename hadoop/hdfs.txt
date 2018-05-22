@@ -1,0 +1,45 @@
+概念：hdfs是一个分布式文件系统，用于存储大数据量的数据。通过目录树定位文件；适用于一次写入多次读读场景，
+且不支持修改文件。适合来做数据分析，并不适合做网盘应用；
+优点：高容错性，大数据处理，流式访问（一次写，多次读，数据一致性），可扩张性
+缺点：不适合低延迟读数据访问，如毫秒级存储；无法高效对大量小文件存储（占用namenode大量内存来存储文件、
+目录和块信息，这是不可取读，因为namenode的内存总是有限读；小文件读存储寻道时间会超过读取时间，违反来hdfs设计目标）；
+并发写入（一个文件只能一个线程写。仅支持数据append，不支持文件修改 ）
+
+①hdfs命令行操作
+ hadoop fs -  unix文件操作命令类似  略
+
+②hdfs客户端操作
+配置信息优先级如副本数：代码>项目里配置文件>集群配置文件
+
+
+③hdfs数据流
+网络拓扑、机架感知
+写数据流程：
+读数据流程： 
+一致性模型：？https://blog.csdn.net/gyflyx/article/details/18442077
+
+④namenode工作机制
+工作机制：略
+加载编辑日志和镜像文件
+secondnamenode工作机制：合并编辑日志edit到镜像文件fsimage（触发条件：时间或transactions数，可修改）；web查看端口号50090
+namenode故障且元数据丢失：两种方式 1scp secondnamenode读对应数据到namenode上然后启动 2 hdfs namenode -importCheckpoint  
+安全模式：  hdfs dfsadmin -safemode  (get/enter/leave/wait)
+namenode多目录设置：本地目录可以配置成多个，且每个目录的内容相同，增加了可靠性
+
+⑤datanoe工作机制
+工作机制：略
+数据完整性：校验和
+datanode多目录配置：跟namenode多目录不同，这个多目录中数据是不一样的，保存不同的数据；
+
+⑥hdfs其他功能
+服役新节点：步骤 略
+退役旧节点：步骤 略
+hadoop distcp 实现两个集群间数据拷贝
+hadoop存档：hadoop arcive 。。。,原文件仍存在，可删除
+快照管理：对一个目录做一个备份（数据备份），但不会立即执行数据备份，直到这个目录变动时；  hdfs dfs/dfsadmin 。。。
+回收站：默认禁用，core-site.xml开启
+
+
+⑦hdfs高可用
+
+面试相关：写、读数据流程/namenode、secondarynamenode工作机制/namenode故障处理/datanode工作机制/节点上下线
