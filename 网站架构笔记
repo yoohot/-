@@ -6,12 +6,10 @@ java api zkClient
 
 第二章 基础设施
 分布式系统基础设施：分布式协作及配置管理系统如zookeeper，分布式缓存系统，持久化存储系统，分布式消息系统mq，搜索引擎，cdn系统，负载均衡系统，运维自动化系统，实时计算系统，离线计算系统，分布式文件系统，日志收集系统，监控系统，数据仓库等；
-
-mysql：主从复制，通过binary log在master->slave中同步：可以使statement level（sql语句，日志量少）或row level（行数据，日志量大）两种方式；为了避免master的单点故障 ，一般采用dual master，即双master，两台mysql互相作为对方的master，这样会导致两个同时更新某个数据时导致被覆盖的情况， dual master并不是提供双master写服务，而是一台提供写服务，另一个stand by或作为读库开放以避免写入冲突，防止不一致情况；master间写切换步骤：略
-分表分库:分表 单表数据量太大， 分表策略：userId分表等，分表仍然是在一个库中，无法解决写库并发大的问题，这时就需要分库，分库策略类似分表；当并发读写都很高时，需同时采用分库分表，同时分库分表策略更为复杂，一种方式：
+1 MYSQL：主从复制，通过binary log在master->slave中同步：可以使statement level（sql语句，日志量少）或row level（行数据，日志量大）两种方式；为了避免master的单点故障 ，一般采用dual master，即双master，两台mysql互相作为对方的master，这样会导致两个同时更新某个数据时导致被覆盖的情况， dual master并不是提供双master写服务，而是一台提供写服务，另一个standby或作为读库开放以避免写入冲突，防止不一致情况；master间写切换步骤：略
+分表分库:分表 单表数据量太大，分表策略：userId分表等，分表仍然是在一个库中，无法解决写库并发大的问题，这时就需要分库，分库策略类似分表；当并发读写都很高时，需同时采用分库分表，同时分库分表策略更为复杂，一种方式：
 中间变量x=userId%(库数量*表数量)，库=取整（中间变量%表数量），表=中间变量%库数量；分库和分表带来的问题：略
-
-hbase：hadoop下的子项目，以google bigTable为原型，实现了高可靠性，高可扩展性，实时读写的列存储数据库。本质上是一个稀疏的大表，存放粗粒度的结构化数据。可以简单的增减节点实现线性扩容。hbase运行在分布式文件系统hdfs之上；理论上再大的表也可以通过集群管理；https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1521453972211&di=5d701c8b201ab9cd5a885869a2ea444e&imgtype=0&src=http%3A%2F%2Fwww.itmmd.com%2Fhtml%2Fkindeditor%2Fpic%2F20141205%2F2014120508231089853121.jpg
+2 HBASE：hadoop下的子项目，以google bigTable为原型，实现了高可靠性，高可扩展性，实时读写的列存储数据库。本质上是一个稀疏的大表，存放粗粒度的结构化数据。可以简单的增减节点实现线性扩容。hbase运行在分布式文件系统hdfs之上；理论上再大的表也可以通过集群管理；https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1521453972211&di=5d701c8b201ab9cd5a885869a2ea444e&imgtype=0&src=http%3A%2F%2Fwww.itmmd.com%2Fhtml%2Fkindeditor%2Fpic%2F20141205%2F2014120508231089853121.jpg
 新增记录 put '表名' ,'rowkey','列族名称:列名称','值'
 获取记录 get '表名','rowkey' 获取列记录 get '表名','rowkey','列族名称:列名称'
 记录总数 count '表名'
@@ -20,8 +18,84 @@ hbase：hadoop下的子项目，以google bigTable为原型，实现了高可靠
 删除行数据 deleteall '表名' ,'rowkey'
 查询hbase数据只有三种方式:rowkey,rowkeyrange查询，scan全表扫描；全表消耗很大，一般不用；因此rowkey设计的好坏是能否充分发挥hbase性能的关键；有的时候为了满足特殊的查询需要建立二级索引，即把rowkey作为某个表的值来存储以供查询 ，但会带来一些问题 
 hbase的伸缩性，写入性等强于关系型数据库，但是查询维度受限，可以用搜索引擎弥补；
+3 REDIS：略               
+4 消息系统：应用间异步通信的一种方式，发送者不用关心接受者状态，activemq，kafka,rabbitmq...
+eg：activemq
+activemq session参数：connection.createSession(Boolean.TRUE,Session.AUTO_ACKNOWLEDGE); 
+  生产者：设置为事务的，则忽略第二个参数，需要commit才能确认发送成功；设置为非事务的，则第二个参数都是一个效果，自动提交成功
+  消费者：设置为事务的，则忽略第二个参数，需要commit才能确认接收成功；设置为非事务的，第二个参数 AUTO_ACKNOWLEDGE自动确认接收成功；CLIENT_ACKNOWLEDGE需要Message的acknowledge方法才能确认接收成功
+producer.setDeliveryMode(DeliveryMode.PERSISTENT); //设置生产者的模式，有两种可选  
+//DeliveryMode.PERSISTENT 当activemq关闭的时候，队列数据将会被保存  
+//DeliveryMode.NON_PERSISTENT 当activemq关闭的时候，队列里面的数据将会被清空   
+  高可用方案：Master-Slave冷备方案。topic或queue使用不同的broker；topic或queue使用类似数据库的分库发表策略
+5 搜索引擎
+  lucene：
+     api：略
+     优化：lucene索引是由段组成，每个段包含一个或多个document，当document增多，段也会增加，查询是从各个段中搜索合并的，这样效率会降低，而且进程打开文件太多会包too many open files异常；
+           lucene会自动进行段的合并，但是合并费时且此过程中查询性能会受影响；优化方案：elasticsearch采用的 读写分离，集群。
 
-redis：略               
+第三章 安全架构
+  1 web攻击：XSS、CSRF、SQL注入，DDos攻击
+    XSS：转义特殊字符
+    CSRF：1 为防止xss获取到cookie，可以设置cookie httponly，这样js等就无法获取到cookie 2 session token，恶意攻击者无法伪造，每次会话可以使用相同的token，会话过期则token失效 3 Refer鉴别
+    SQL注入：预编译
+    文件上传漏洞：
+    DDos攻击：TCP的SYN Flood方式（伪造ip地址，第三步就不会受到客户端确认握手，导致大量阻塞）;DNS Query Flood;CC 肉鸡方式
+  2 常见的安全算法
+    数字摘要：验证完整性，放篡改:MD5,SHA
+    对称加密：DES，3DES（三次des），AES（推荐）
+    非对称加密：公钥私钥，速度较慢，可以结合对称加密，非对称加密用来给对称加密的秘钥进行加密;RSA非对称加密
+    数字签名：数字摘要---->非对称加密=数字签名;MD5withRSA,SHAwithRSA
+    数字证书：包含数字签名等信息;证书校验：通过证书认证机构的根证书获取证书颁发者的公钥，通过公钥，对数字签名进行校验；根证书是认证机构对自己颁发的证书，是证书信任链的起点，安转根证书就代表对这个认证机构的信任；
+  3 摘要认证放篡改，数字签名验证合法性，https防监听和截获
+  4 OAuth数据授权
 
-消息系统：应用间通信的一种方式，activemq，kafka,rabbitmq...
+第四章 系统稳定性
+1在线日至分析
+  shell常用命令：cat 查看小文件 -n 显示行号；more，less，tail，head
+  wc：统计文件字符数，行数，字数等 -w 单词数
+  grep:查找字符串 eg grep qq access.log.  -c 显示行号，grep支持正则查找 grep -c 'G.*T' access.log
+  find:查找文件；whereis locate
+  expr：计算加减乘除  ，expr 1+2  ，expr 2 \* 3
+  tar:归探 tar -csvf tarname.tar  file1 ...； tar -zxvf tarname.tar
+  curl：-i 返回带上header
+  sed：
+  awk：
+2集群监控
+  load：cpu负载，越高负载越重；uptime
+  cpu利用率： top|grep Cpu
+  磁盘信息: df -h
+  网络负载：sar -n DEV 1 1
+  磁盘I/O：iostat -d -k
+  内存使用： free -m
+  qps,rt
+  gc：minorGC和majorGC
+  峰值qps=（80%*日PV）/(24*24*60*20%) 百分之八十的pv在百分之二十的时间内；  机器数=峰值qps/单台pc的峰值qps；当前水位=当前总qps/(单台qps峰值*机器数) *100%
+3流量控制
+4性能优化
+ 1定位瓶颈 前端yslow，接口 firebug，后端 btrace，gc日志:java1.6提供了Parallel Scavenge/Parallel Old 和ParNew/CMS两种常用的垃圾收集器组合，其中Parallel Scavenge和ParNew为新生代收集器，而Parallel Old和CMS为老年代收集器，打印gc日志参数: -verbose:gc -Xloggc:/gc.log -XX:+PrintGCDetails -XX:+PrintGCDateStamps;数据库慢查询
+ 2性能测试工具
+  ab: ab -n 请求数 -c 并发数 url
+  jmeter:
+ 3性能优化措施
+ 4工具 略
+ 5案例
+
+第五章 数据分析
+1日志收集
+
+
+
+
+
+
+
+
+   
+  
+    
+
+ 
+
+
 

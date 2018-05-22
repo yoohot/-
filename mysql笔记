@@ -82,11 +82,22 @@ ACID
  带保存点的扁平事务
  链事务
  嵌套事务
- 分布式事务：两段式提交 第一阶段：所有节点准备就绪 第二阶段：集中管理器告诉commit或rollback，innodb支持XA事务时隔离级别必须是serializable
+ 分布式事务：https://www.toutiao.com/a6534824963424125448/?iid=28080401580&app=news_article&timestamp=1521592142
+      XA:两段式提交 第一阶段：所有节点准备就绪 第二阶段：集中管理器告诉commit或rollback，innodb支持XA事务时隔离级别必须是serializable
+      TCC:一个完整的 TCC 分布式事务流程如下：
+        1.主业务服务首先开启本地事务；
+        2.主业务服务向业务活动管理器申请启动分布式事务主业务活动；
+        3.然后针对要调用的从业务服务，主业务活动先向业务活动管理器注册从业务活动，然后调用从业务服务的 Try 接口；
+        4.当所有从业务服务的 Try 接口调用成功，主业务服务提交本地事务；若调用失败，主业务服务回滚本地事务；
+        5.若主业务服务提交本地事务，则 TCC 模型分别调用所有从业务服务的 Confirm 接口；若主业务服务回滚本地事务，则分别调用 Cancel 接口；
+        6.所有从业务服务的 Confirm 或 Cancel 操作完成后，全局事务结束。
+BASE 理论是指 BA（Basic Availability，基本业务可用性）；S（Softstate，柔性状态）；E（Eventualconsistency，最终一致性）。该理论认为为了可用性、性能与降级服务的需要，可以适当降低一点一致性的要求，即“基本可用，最终一致”。
+业内通常把严格遵循 ACID 的事务称为刚性事务；而基于 BASE 思想实现的事务称为柔性事务。柔性事务并不是完全放弃了 ACID，仅仅是放宽了一致性要求：事务完成后的一致性严格遵循，事务中的一致性可适当放宽。
+
 事务的实现：隔离性：锁  ；持久性 ：redo log  & undo log（回滚使用）
  事务commit： redo日志强制刷新到磁盘redo log文件成功才算成功，会将redo log刷到磁盘缓冲，然后调用fsync强制磁盘缓冲到磁盘文件，可以配置fsync策略，默认每次提交都fsync.
 
-binlog 和redo log: binlog 用来point-in-time的恢复和主从复制的，binlog是mysql数据库层面，redo是存储引擎层面；内容也不同。
+binlog ,redo log和undo log: binlog用来point-in-time的恢复和主从复制的，binlog是mysql数据库层面，redo是存储引擎层面；内容也不同。redo日志在系统需要时对事务操作进行重做，当系统宕机重启后，能够对内存中还没有持久化到磁盘的数据进行恢复；而undo日志则能够在事务执行失败时，利用这些undo日志将数据还原到事务执行前的状态，事务日志保证数据存储的可靠性又提高了io效率
 
 SHOW GLOBAL STATUS LIKE 'com_commit' 查看tps
 
